@@ -242,21 +242,11 @@ def _vertical_filters(srt_f, cta_filter):
 
 def render_youtube_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_dur, add_cta=True):
     """Renderiza clip YouTube: 1080x1920, blur de fondo, subtítulos, música opcional, CTA."""
+    import shutil, platform
     out = os.path.join(OUTPUT_DIR, f'clip_{job_id}_{clip_idx:03d}.mp4')
 
-    font_esc = FONT_PATH.replace(':', r'\:').replace("'", r"\'") if os.path.exists(FONT_PATH) else ""
-    font_arg = f":fontfile='{font_esc}'" if font_esc else ""
     srt_f = subtitle_filter(srt_path)
-
     cta_filter = ""
-    if add_cta:
-        cta_start = max(0, clip_dur - 3.0)
-        cta_filter = (
-            f",drawtext=text='Seguime para más ↓':fontsize=52:fontcolor=white"
-            f"{font_arg}:x=(w-text_w)/2:y=h-200"
-            f":box=1:boxcolor=black@0.55:boxborderw=18"
-            f":enable='gte(t\\,{cta_start})'"
-        )
 
     vf = _vertical_filters(srt_f, cta_filter)
 
@@ -275,9 +265,14 @@ def render_youtube_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_d
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         print("ffmpeg stderr:", proc.stderr[-800:])
-        # fallback: copiar el raw clip sin procesar
-        if not os.path.exists(out):
-            import shutil; shutil.copy2(raw_clip, out)
+        # fallback: solo escalar a vertical sin subtítulos
+        cmd2 = ['ffmpeg', '-y', '-i', raw_clip,
+                '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black',
+                '-t', str(clip_dur), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                '-c:a', 'aac', '-b:a', '128k', out]
+        proc2 = subprocess.run(cmd2, capture_output=True, text=True)
+        if proc2.returncode != 0:
+            shutil.copy2(raw_clip, out)
     return out
 
 def render_reel_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_dur):
