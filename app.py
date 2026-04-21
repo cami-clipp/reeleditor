@@ -275,6 +275,9 @@ def render_youtube_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_d
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         print("ffmpeg stderr:", proc.stderr[-800:])
+        # fallback: copiar el raw clip sin procesar
+        if not os.path.exists(out):
+            import shutil; shutil.copy2(raw_clip, out)
     return out
 
 def render_reel_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_dur):
@@ -292,7 +295,11 @@ def render_reel_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_dur)
                '-filter_complex', fc, '-map', '[vout]', '-map', '0:a']
     cmd += ['-t', str(clip_dur), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k', out]
-    subprocess.run(cmd, capture_output=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        print("ffmpeg stderr:", proc.stderr[-800:])
+        if not os.path.exists(out):
+            import shutil; shutil.copy2(raw_clip, out)
     return out
 
 # ─── YouTube download ─────────────────────────────────────────────────────────
