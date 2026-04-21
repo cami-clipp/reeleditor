@@ -203,12 +203,33 @@ def segments_to_srt(segments, srt_path):
         f.write(header + '\n'.join(dialogues))
 
 def subtitle_filter(srt_path):
+    import platform
     srt_path = os.path.abspath(srt_path)
     srt_esc = srt_path.replace('\\', '/').replace(':', r'\:').replace("'", r"\'")
-    font_dir_esc = FONT_DIR.replace(':', r'\:').replace("'", r"\'")
+    font_dir_esc = FONT_DIR.replace('\\', '/').replace(':', r'\:').replace("'", r"\'")
     if os.path.exists(FONT_PATH):
-        return f"ass='{srt_esc}':fontsdir='{font_dir_esc}'"
-    return f"ass='{srt_esc}'"
+        return f"subtitles='{srt_esc}':fontsdir='{font_dir_esc}'"
+    return f"subtitles='{srt_esc}'"
+
+def _ffmpeg_env():
+    """Env vars para ffmpeg — en Windows crea un fontconfig mínimo si no existe."""
+    import platform, shutil
+    env = os.environ.copy()
+    if platform.system() == 'Windows':
+        fc_dir = os.path.join(os.path.dirname(__file__), '.fontconfig')
+        fc_file = os.path.join(fc_dir, 'fonts.conf')
+        if not os.path.exists(fc_file):
+            os.makedirs(fc_dir, exist_ok=True)
+            font_path = FONT_DIR.replace('\\', '/')
+            with open(fc_file, 'w') as f:
+                f.write(f'''<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>{font_path}</dir>
+  <dir>C:/Windows/Fonts</dir>
+</fontconfig>''')
+        env['FONTCONFIG_FILE'] = fc_file
+    return env
 
 # ─── video filters ────────────────────────────────────────────────────────────
 
@@ -262,15 +283,17 @@ def render_youtube_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_d
 
     cmd += ['-t', str(clip_dur), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k', out]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    env = _ffmpeg_env()
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         print("ffmpeg stderr:", proc.stderr[-800:])
+        import shutil
         # fallback: solo escalar a vertical sin subtítulos
         cmd2 = ['ffmpeg', '-y', '-i', raw_clip,
                 '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black',
                 '-t', str(clip_dur), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
                 '-c:a', 'aac', '-b:a', '128k', out]
-        proc2 = subprocess.run(cmd2, capture_output=True, text=True)
+        proc2 = subprocess.run(cmd2, capture_output=True, text=True, env=env)
         if proc2.returncode != 0:
             shutil.copy2(raw_clip, out)
     return out
@@ -290,7 +313,8 @@ def render_reel_clip(raw_clip, music_path, srt_path, clip_idx, job_id, clip_dur)
                '-filter_complex', fc, '-map', '[vout]', '-map', '0:a']
     cmd += ['-t', str(clip_dur), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k', out]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    env = _ffmpeg_env()
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         print("ffmpeg stderr:", proc.stderr[-800:])
         if not os.path.exists(out):
