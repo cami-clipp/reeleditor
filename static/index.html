@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reel Editor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Montserrat', sans-serif;
+    background: #0a0a0f;
+    color: #e8e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 28px 40px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  header .logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #a78bfa, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .tagline {
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 300;
+  }
+
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 0;
+    height: calc(100vh - 81px);
+  }
+
+  /* LEFT PANEL */
+  .panel-left {
+    border-right: 1px solid rgba(255,255,255,0.07);
+    padding: 32px 28px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 12px;
+  }
+
+  /* MODE TOGGLE */
+  .mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .mode-btn {
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .mode-btn.active {
+    background: rgba(167,139,250,0.2);
+    color: #a78bfa;
+    border: 1px solid rgba(167,139,250,0.3);
+  }
+
+  /* DROP ZONES */
+  .drop-zone {
+    border: 1.5px dashed rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: rgba(167,139,250,0.5);
+    background: rgba(167,139,250,0.05);
+  }
+
+  .drop-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-zone .icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .drop-zone p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    line-height: 1.5;
+  }
+
+  .drop-zone .hint {
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+    margin-top: 4px;
+  }
+
+  .file-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .file-item {
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .file-item .remove {
+    margin-left: auto;
+    cursor: pointer;
+    color: rgba(255,255,255,0.2);
+    font-size: 16px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  .file-item .remove:hover { color: #ec4899; }
+
+  /* SETTINGS */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .field input, .field select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: #e8e8f0;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: rgba(167,139,250,0.5);
+  }
+
+  /* PROMPT */
+  .prompt-area {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    color: #e8e8f0;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+
+  .prompt-area:focus {
+    border-color: rgba(167,139,250,0.4);
+  }
+
+  .prompt-area::placeholder { color: rgba(255,255,255,0.2); }
+
+  /* START BUTTON */
+  .btn-start {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #7c3aed, #db2777);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-start:hover { opacity: 0.9; }
+  .btn-start:active { transform: scale(0.99); }
+  .btn-start:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* RIGHT PANEL */
+  .panel-right {
+    display: flex;
+    flex-direction: column;
+    padding: 32px 40px;
+    gap: 24px;
+    overflow-y: auto;
+  }
+
+  /* PROGRESS */
+  .progress-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .progress-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .progress-pct {
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #a78bfa, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .progress-bar-bg {
+    height: 6px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed, #ec4899);
+    border-radius: 99px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  .log-box {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 12px;
+    line-height: 1.9;
+    color: rgba(255,255,255,0.5);
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Montserrat', monospace;
+  }
+
+  .log-box .log-line { display: block; }
+  .log-box .log-line.new { color: rgba(255,255,255,0.85); }
+
+  /* VIDEO PREVIEW */
+  .preview-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 28px;
+    display: none;
+  }
+
+  .preview-card.show { display: block; }
+
+  .preview-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .preview-card video {
+    width: 100%;
+    max-height: 480px;
+    border-radius: 10px;
+    background: #000;
+  }
+
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 11px 24px;
+    background: rgba(167,139,250,0.15);
+    border: 1px solid rgba(167,139,250,0.35);
+    border-radius: 10px;
+    color: #a78bfa;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .btn-download:hover {
+    background: rgba(167,139,250,0.25);
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.15);
+    text-align: center;
+    gap: 12px;
+  }
+
+  .empty-state .big-icon { font-size: 56px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .status-badge.idle { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.35); }
+  .status-badge.running { background: rgba(167,139,250,0.2); color: #a78bfa; }
+  .status-badge.done { background: rgba(52,211,153,0.15); color: #34d399; }
+  .status-badge.error { background: rgba(239,68,68,0.15); color: #f87171; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎬 Reel Editor</div>
+  <div class="tagline">Edición automática con IA</div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT: Controls -->
+  <div class="panel-left">
+
+    <div>
+      <div class="section-title">Modo</div>
+      <div class="mode-toggle" style="grid-template-columns:1fr 1fr 1fr;">
+        <button class="mode-btn active" onclick="setMode('clips')" id="btn-clips">
+          🎞️ Clips
+        </button>
+        <button class="mode-btn" onclick="setMode('long')" id="btn-long">
+          🎥 Video
+        </button>
+        <button class="mode-btn" onclick="setMode('youtube')" id="btn-youtube">
+          ▶️ YouTube
+        </button>
+      </div>
+    </div>
+
+    <!-- YouTube URL -->
+    <div id="section-yt" style="display:none">
+      <div class="section-title">URL de YouTube</div>
+      <div class="field">
+        <input type="url" id="yt-url" placeholder="https://www.youtube.com/watch?v=..." style="width:100%">
+      </div>
+      <p style="font-size:11px;color:rgba(255,255,255,0.25);margin-top:8px;">Pegá el link del podcast o video</p>
+    </div>
+
+    <div id="section-video">
+      <div class="section-title" id="video-label">Videos / Clips</div>
+      <div class="drop-zone" id="dz-video"
+           ondragover="onDragOver(event,'dz-video')"
+           ondragleave="onDragLeave('dz-video')"
+           ondrop="onDrop(event,'video')">
+        <input type="file" id="input-video" multiple accept="video/*" onchange="onFileSelect(event,'video')">
+        <div class="icon">🎞️</div>
+        <p>Arrastrá los clips aquí<br>o hacé click para seleccionar</p>
+        <p class="hint">MP4, MOV, AVI</p>
+      </div>
+      <div class="file-list" id="list-video"></div>
+    </div>
+
+    <div>
+      <div class="section-title">Música</div>
+      <div class="drop-zone" id="dz-music"
+           ondragover="onDragOver(event,'dz-music')"
+           ondragleave="onDragLeave('dz-music')"
+           ondrop="onDrop(event,'music')">
+        <input type="file" id="input-music" accept="audio/*,video/*" onchange="onFileSelect(event,'music')">
+        <div class="icon">🎵</div>
+        <p>Arrastrá la música aquí</p>
+        <p class="hint">MP3, WAV, M4A</p>
+      </div>
+      <div class="file-list" id="list-music"></div>
+    </div>
+
+    <div>
+      <div class="section-title">Configuración</div>
+      <div class="settings-grid" id="cfg-grid-clips">
+        <div class="field">
+          <label>Duración final (seg)</label>
+          <input type="number" id="cfg-duration" value="45" min="10" max="300">
+        </div>
+        <div class="field">
+          <label>Duración por clip (seg)</label>
+          <input type="number" id="cfg-clip-dur" value="5" min="2" max="30">
+        </div>
+      </div>
+      <div id="cfg-grid-yt" style="display:none;">
+        <div class="field">
+          <label>Cantidad de clips (0 = automático)</label>
+          <input type="number" id="cfg-n-clips" value="0" min="0" max="30" style="width:100%">
+        </div>
+        <p style="font-size:11px;color:rgba(255,255,255,0.25);margin-top:8px;">
+          Cada clip dura entre 50 seg y 3 min según los cortes naturales del audio.
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Instrucciones adicionales</div>
+      <textarea class="prompt-area" id="prompt"
+        placeholder="Ej: enfocate en momentos con mucha energía, que el reel tenga ritmo rápido, los clips más gracioso primero..."></textarea>
+    </div>
+
+    <button class="btn-start" id="btn-start" onclick="startJob()" disabled>
+      Generar Reel ✨
+    </button>
+
+  </div>
+
+  <!-- RIGHT: Output -->
+  <div class="panel-right">
+
+    <div class="progress-card" id="progress-card" style="display:none">
+      <div class="progress-header">
+        <div>
+          <div class="progress-title">Procesando reel</div>
+          <span class="status-badge running" id="status-badge">Corriendo</span>
+        </div>
+        <div class="progress-pct" id="progress-pct">0%</div>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-bar"></div>
+      </div>
+      <div class="log-box" id="log-box"></div>
+    </div>
+
+    <div class="preview-card" id="preview-card">
+      <h3 id="preview-title">✅ Reel listo</h3>
+      <video id="preview-video" controls playsinline></video>
+      <div id="clips-nav" style="display:none; margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <span style="font-size:12px;color:rgba(255,255,255,0.35);">Clips:</span>
+        <div id="clips-btns" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      </div>
+      <br>
+      <a class="btn-download" id="btn-download" download>⬇️ Descargar</a>
+      <a class="btn-download" id="btn-download-all" style="display:none;margin-left:8px;" href="/download-all">
+        ⬇️ Descargar todos (.zip)
+      </a>
+    </div>
+
+    <div class="empty-state" id="empty-state">
+      <div class="big-icon">🎬</div>
+      <p>Cargá tus clips y música<br>y generá tu reel automáticamente</p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let mode = 'clips';
+let uploadedFiles = { video: [], music: [] };
+let serverFiles = { video: [], music: [] };
+let allOutputClips = [];
+
+function setMode(m) {
+  mode = m;
+  ['clips','long','youtube'].forEach(id =>
+    document.getElementById('btn-'+id).classList.toggle('active', m === id)
+  );
+  const isYt = m === 'youtube';
+  document.getElementById('section-yt').style.display = isYt ? 'block' : 'none';
+  document.getElementById('section-video').style.display = isYt ? 'none' : 'block';
+  document.getElementById('cfg-grid-clips').style.display = isYt ? 'none' : 'grid';
+  document.getElementById('cfg-grid-yt').style.display = isYt ? 'block' : 'none';
+  document.getElementById('video-label').textContent = m === 'long' ? 'Video largo' : 'Videos / Clips';
+  document.getElementById('input-video').multiple = m === 'clips';
+  checkReady();
+}
+
+function onDragOver(e, id) {
+  e.preventDefault();
+  document.getElementById(id).classList.add('drag-over');
+}
+
+function onDragLeave(id) {
+  document.getElementById(id).classList.remove('drag-over');
+}
+
+function onDrop(e, type) {
+  e.preventDefault();
+  const id = type === 'video' ? 'dz-video' : 'dz-music';
+  document.getElementById(id).classList.remove('drag-over');
+  uploadFiles(e.dataTransfer.files, type);
+}
+
+function onFileSelect(e, type) {
+  uploadFiles(e.target.files, type);
+}
+
+async function uploadFiles(fileList, type) {
+  const formData = new FormData();
+  for (const f of fileList) formData.append('file', f);
+
+  const res = await fetch('/upload', { method: 'POST', body: formData });
+  const saved = await res.json();
+
+  for (const s of saved) {
+    if (type === 'video') {
+      serverFiles.video.push(s.path);
+      uploadedFiles.video.push(s.original);
+    } else {
+      serverFiles.music = [s.path];
+      uploadedFiles.music = [s.original];
+    }
+  }
+  renderFileLists();
+  checkReady();
+}
+
+function renderFileLists() {
+  ['video', 'music'].forEach(type => {
+    const el = document.getElementById(`list-${type}`);
+    el.innerHTML = uploadedFiles[type].map((name, i) => `
+      <div class="file-item">
+        <span>${type === 'video' ? '🎞️' : '🎵'}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>
+        <span class="remove" onclick="removeFile('${type}',${i})">×</span>
+      </div>
+    `).join('');
+  });
+}
+
+function removeFile(type, i) {
+  uploadedFiles[type].splice(i, 1);
+  serverFiles[type].splice(i, 1);
+  renderFileLists();
+  checkReady();
+}
+
+function checkReady() {
+  const hasVideo = mode === 'youtube'
+    ? document.getElementById('yt-url').value.trim().length > 5
+    : serverFiles.video.length > 0;
+  document.getElementById('btn-start').disabled = !hasVideo;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('yt-url').addEventListener('input', checkReady);
+});
+
+async function startJob() {
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('preview-card').classList.remove('show');
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('progress-pct').textContent = '0%';
+  setBadge('running', 'Procesando...');
+
+  const body = {
+    mode,
+    files: serverFiles.video,
+    music: serverFiles.music[0],
+    duration: parseInt(document.getElementById('cfg-duration').value || 45),
+    clip_duration: parseInt(document.getElementById('cfg-clip-dur').value || 5),
+    n_clips: mode === 'youtube' ? parseInt(document.getElementById('cfg-n-clips').value || 0) : 0,
+    prompt: document.getElementById('prompt').value,
+    yt_url: document.getElementById('yt-url').value.trim(),
+  };
+
+  const res = await fetch('/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const { job_id, error } = await res.json();
+  if (error) { addLog('❌ ' + error); return; }
+
+  listenProgress(job_id);
+}
+
+function listenProgress(job_id) {
+  const es = new EventSource(`/progress/${job_id}`);
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.new_messages) data.new_messages.forEach(addLog);
+    if (data.progress != null) setProgress(data.progress);
+    if (data.status === 'done') {
+      setBadge('done', '¡Listo!');
+      es.close();
+      if (data.outputs && data.outputs.length > 1) {
+        showMultiClips(data.outputs, job_id);
+      } else if (data.output) {
+        showPreview(data.output, 1);
+      }
+      document.getElementById('btn-start').disabled = false;
+    }
+    if (data.status === 'error') {
+      setBadge('error', 'Error');
+      es.close();
+      document.getElementById('btn-start').disabled = false;
+    }
+  };
+}
+
+function addLog(msg) {
+  const box = document.getElementById('log-box');
+  const line = document.createElement('span');
+  line.className = 'log-line new';
+  line.textContent = msg;
+  box.appendChild(line);
+  box.appendChild(document.createElement('br'));
+  box.scrollTop = box.scrollHeight;
+  setTimeout(() => line.classList.remove('new'), 2000);
+}
+
+function setProgress(pct) {
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+}
+
+function setBadge(status, text) {
+  const badge = document.getElementById('status-badge');
+  badge.className = 'status-badge ' + status;
+  badge.textContent = text;
+}
+
+function showPreview(url, hideNav) {
+  const card = document.getElementById('preview-card');
+  card.classList.add('show');
+  const vid = document.getElementById('preview-video');
+  vid.src = url;
+  vid.load();
+  const dl = document.getElementById('btn-download');
+  dl.href = url;
+  dl.download = url.split('/').pop();
+  if (hideNav) document.getElementById('clips-nav').style.display = 'none';
+}
+
+function showMultiClips(outputs, job_id) {
+  allOutputClips = outputs;
+  document.getElementById('preview-title').textContent = `✅ ${outputs.length} clips listos`;
+  const nav = document.getElementById('clips-nav');
+  nav.style.display = 'flex';
+  const btns = document.getElementById('clips-btns');
+  btns.innerHTML = outputs.map((url, i) => `
+    <button onclick="selectClip(${i})" id="clip-btn-${i}"
+      style="padding:6px 14px;border-radius:8px;border:1px solid rgba(167,139,250,0.3);
+             background:${i===0?'rgba(167,139,250,0.2)':'rgba(255,255,255,0.05)'};
+             color:${i===0?'#a78bfa':'rgba(255,255,255,0.5)'};
+             font-family:Montserrat,sans-serif;font-size:12px;cursor:pointer;">
+      Clip ${i+1}
+    </button>
+  `).join('');
+  const btnAll = document.getElementById('btn-download-all');
+  btnAll.href = `/download-all/${job_id}`;
+  btnAll.style.display = 'inline-flex';
+  showPreview(outputs[0], false);
+}
+
+function selectClip(i) {
+  document.querySelectorAll('[id^=clip-btn-]').forEach((b, j) => {
+    b.style.background = j===i ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.05)';
+    b.style.color = j===i ? '#a78bfa' : 'rgba(255,255,255,0.5)';
+  });
+  const vid = document.getElementById('preview-video');
+  vid.src = allOutputClips[i];
+  vid.load();
+  const dl = document.getElementById('btn-download');
+  dl.href = allOutputClips[i];
+  dl.download = `clip_${i+1}.mp4`;
+}
+</script>
+</body>
+</html>

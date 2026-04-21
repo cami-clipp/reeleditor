@@ -1,0 +1,5 @@
+flask
+openai-whisper
+librosa
+numpy
+yt-dlp
