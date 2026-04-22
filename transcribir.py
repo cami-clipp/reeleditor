@@ -7,6 +7,6 @@ import os
 try: os.nice(15)
 except: pass
 
-model = whisper.load_model("small")
-result = model.transcribe(video_path, language=None, word_timestamps=True, fp16=False)
+model = whisper.load_model("tiny")
+result = model.transcribe(video_path, language="es", word_timestamps=True, fp16=False)
 print(json.dumps(result.get('segments', [])))
