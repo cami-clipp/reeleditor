@@ -5,6 +5,77 @@ import librosa
 import numpy as np
 import yt_dlp
 
+def transcribe_video(video_path):
+    """Transcribe con Whisper small en subprocess. Retorna lista de segmentos."""
+    _script = os.path.join(os.path.dirname(__file__), 'transcribir.py')
+    _r = subprocess.run([sys.executable, _script, video_path], capture_output=True, text=True, timeout=600)
+    if _r.stdout.strip():
+        return json.loads(_r.stdout)
+    return []
+
+def detect_coherent_clips(segments, n_clips, min_dur=45, max_dur=90):
+    """
+    Elige clips que empiezan y terminan en frases completas.
+    Busca los n_clips bloques de segmentos más 'densos' (más palabras por segundo).
+    """
+    if not segments:
+        return []
+
+    total_dur = segments[-1]['end'] if segments else 0
+
+    # Puntuar cada segmento por densidad de palabras
+    scored = []
+    for seg in segments:
+        dur = seg['end'] - seg['start']
+        words = len(seg.get('text', '').split())
+        if dur > 0:
+            scored.append((words / dur, seg['start'], seg['end']))
+
+    scored.sort(reverse=True)
+
+    clips = []
+    for _, anchor_start, anchor_end in scored:
+        if len(clips) >= n_clips:
+            break
+
+        # Expandir desde este segmento hasta llenar min_dur sin pasar max_dur
+        clip_start = anchor_start
+        clip_end = anchor_end
+
+        # Extender hacia adelante sumando segmentos completos
+        for seg in segments:
+            if seg['start'] < clip_end:
+                continue
+            if seg['end'] - clip_start > max_dur:
+                break
+            clip_end = seg['end']
+            if clip_end - clip_start >= min_dur:
+                break
+
+        # Si quedó muy corto, extender hacia atrás
+        if clip_end - clip_start < min_dur:
+            for seg in reversed(segments):
+                if seg['end'] > clip_start:
+                    continue
+                if clip_end - seg['start'] > max_dur:
+                    break
+                clip_start = seg['start']
+                if clip_end - clip_start >= min_dur:
+                    break
+
+        dur = clip_end - clip_start
+        if dur < 20:
+            continue
+
+        # No superponer con clips ya elegidos
+        overlap = any(not (clip_end < cs or clip_start > ce) for cs, ce in clips)
+        if overlap:
+            continue
+
+        clips.append((clip_start, min(clip_end, total_dur - 0.5)))
+
+    return sorted(clips, key=lambda x: x[0])
+
 app = Flask(__name__, static_folder='static')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'outputs')
@@ -202,10 +273,17 @@ def run_job(job_id, mode, files, music_path, n_clips_req, extra_prompt, yt_url=N
             total_dur = get_duration(video_path)
             n_clips = n_clips_req if n_clips_req > 0 else max(3, int(total_dur // 90))
 
-            log(job_id, f"🔍 Analizando audio para encontrar {n_clips} momentos clave...", 20)
-            clip_ranges = detect_smart_clips(video_path, n_clips, min_dur=45, max_dur=90)
-            log(job_id, f"📍 {len(clip_ranges)} clips detectados: " +
-                ", ".join(f"{s:.0f}s-{e:.0f}s ({e-s:.0f}s)" for s, e in clip_ranges), 35)
+            log(job_id, "🎙️ Transcribiendo para detectar frases completas (Whisper small)...", 20)
+            segments = transcribe_video(video_path)
+            if segments:
+                clip_ranges = detect_coherent_clips(segments, n_clips, min_dur=45, max_dur=90)
+                log(job_id, f"📍 {len(clip_ranges)} clips con coherencia narrativa: " +
+                    ", ".join(f"{s:.0f}s-{e:.0f}s ({e-s:.0f}s)" for s, e in clip_ranges), 35)
+            else:
+                log(job_id, "⚠️ Sin transcripción, usando análisis de audio...", 28)
+                clip_ranges = detect_smart_clips(video_path, n_clips, min_dur=45, max_dur=90)
+                log(job_id, f"📍 {len(clip_ranges)} clips detectados: " +
+                    ", ".join(f"{s:.0f}s-{e:.0f}s ({e-s:.0f}s)" for s, e in clip_ranges), 35)
 
             if music_path:
                 log(job_id, "🎵 Detectando beats de la música...", 40)
