@@ -101,10 +101,7 @@ def render_youtube_clip(raw_clip, music_path, clip_idx, job_id, clip_dur):
 
     vf = (
         "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-        "crop=1080:1920,boxblur=25:8[bg];"
-        "[0:v]scale=1080:-2:force_original_aspect_ratio=decrease[fg_s];"
-        "[fg_s]pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black@0[fg];"
-        "[bg][fg]overlay=(W-w)/2:(H-h)/2[vout]"
+        "crop=1080:1920[vout]"
     )
 
     if music_path:
@@ -123,7 +120,7 @@ def render_youtube_clip(raw_clip, music_path, clip_idx, job_id, clip_dur):
     if proc.returncode != 0:
         print("ffmpeg stderr:", proc.stderr[-800:])
         cmd2 = ['ffmpeg', '-y', '-i', raw_clip,
-                '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black',
+                '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920',
                 '-t', str(clip_dur), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
                 '-c:a', 'aac', '-b:a', '128k', out]
         proc2 = subprocess.run(cmd2, capture_output=True, text=True)
